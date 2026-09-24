@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pase de Asistencia Cloud | Nexu</title>
+    <!-- Librería para generar Excel (.xlsx) -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    
+    <!-- Librerías de Firebase (v9 modular) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-app.js";
+        import { getFirestore, collection, getDocs, doc, setDoc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+  apiKey: "AIzaSyBcehX3MaEmCieovpjS4I0QDcB4g40Zoto",
+  authDomain: "innovacodehub-asistencia.firebaseapp.com",
+  projectId: "innovacodehub-asistencia",
+  storageBucket: "innovacodehub-asistencia.firebasestorage.app",
+  messagingSenderId: "292148773576",
+  appId: "1:292148773576:web:c68bb0e7ed269623459bfd",
+  measurementId: "G-3MVNQGE894"
+};
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        
+        window.db = db;
+        window.collection = collection;
+        window.getDocs = getDocs;
+        window.doc = doc;
+        window.setDoc = setDoc;
+        window.getDoc = getDoc;
+        window.updateDoc = updateDoc;
+        
+        // Disparar evento cuando Firebase esté listo
+        document.dispatchEvent(new Event('firebase-ready'));
+    </script>
+
+    <style>
+        /* (Los estilos visuales se mantienen idénticos para el diseño moderno de la app) */
+        :root {
+            --bg-body: #f4f2f9; --bg-card: #ffffff; --primary: #7c3aed; --primary-hover: #6d28d9;
+            --primary-light: #ede9fe; --text-main: #1e293b; --text-muted: #64748b; --border: #e2e8f0;
+            --danger: #ef4444; --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', system-ui, sans-serif; }
+        body { background-color: var(--bg-body); color: var(--text-main); padding: 2rem 1rem; display: flex; justify-content: center; }
+        .app-container { width: 100%; max-width: 1100px; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem; }
+        .title h1 { font-size: 1.5rem; font-weight: 700; color: var(--primary); }
+        .title p { font-size: 0.875rem; color: var(--text-muted); margin-top: 0.25rem; }
+        
+        /* Loading Overlay */
+        #loader {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255,255,255,0.9); z-index: 9999;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            font-weight: bold; color: var(--primary); transition: opacity 0.3s;
+        }
+        .spinner {
+            border: 4px solid var(--primary-light); border-top: 4px solid var(--primary);
+            border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 15px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Toolbar y Tabla */
+        .toolbar { background: var(--bg-card); padding: 1rem 1.5rem; border-radius: 12px; box-shadow: var(--shadow); display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem; }
+        .tool-group { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+        .input-box { display: flex; flex-direction: column; gap: 0.25rem; }
+        .input-box label { font-size: 0.75rem; text-transform: uppercase; font-weight: 600; color: var(--text-muted); }
+        input[type="date"], select, input[type="text"] { padding: 0.5rem 0.75rem; border: 1px solid var(--border); border-radius: 8px; font-size: 0.875rem; outline: none; background-color: #f8fafc; }
+        .btn { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1rem; border: none; border-radius: 8px; font-size: 0.875rem; font-weight: 600; cursor: pointer; transition: 0.2s; }
+        .btn-primary { background-color: var(--primary); color: white; }
+        .btn-outline { background-color: transparent; color: var(--primary); border: 1px solid var(--primary); }
+        .btn-excel { background-color: #107c41; color: white; }
+        .table-card { background: var(--bg-card); border-radius: 12px; box-shadow: var(--shadow); overflow: hidden; }
+        .table-responsive { width: 100%; overflow-x: auto; max-height: 60vh; }
+        table { width: 100%; border-collapse: collapse; text-align: left; white-space: nowrap; }
+        th { background-color: #f8fafc; color: var(--text-muted); font-size: 0.75rem; padding: 1rem; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10; }
+        td { padding: 1rem; border-bottom: 1px solid var(--border); font-size: 0.875rem; }
+        tr:hover td { background-color: #fcfbfd; }
+        .badge { background-color: var(--primary-light); color: var(--primary-hover); padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
+        .check-cell { text-align: center; }
+        input[type="checkbox"] { width: 1.25rem; height: 1.25rem; border-radius: 4px; border: 2px solid var(--border); appearance: none; outline: none; cursor: pointer; position: relative; }
+        input[type="checkbox"]:checked { background-color: var(--primary); border-color: var(--primary); }
+        input[type="checkbox"]:checked::after { content: ''; position: absolute; left: 5px; top: 1px; width: 5px; height: 10px; border: solid white; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+        
+        /* Modal */
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.5); display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: 0.3s; z-index: 50; }
+        .modal-overlay.active { opacity: 1; pointer-events: auto; }
+        .modal { background: var(--bg-card); width: 100%; max-width: 400px; border-radius: 12px; padding: 1.5rem; transform: translateY(20px); transition: 0.3s; }
+        .modal-overlay.active .modal { transform: translateY(0); }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+        .modal-body { display: flex; flex-direction: column; gap: 1rem; margin-bottom: 1.5rem; }
+        .modal-footer { display: flex; justify-content: flex-end; gap: 0.5rem; }
+    </style>
+</head>
+<body>
+
+<div id="loader">
+    <div class="spinner"></div>
+    <span id="loader-text">Conectando a la nube...</span>
+</div>
+
+<div class="app-container">
+    <div class="header">
+        <div class="title">
+            <h1>Panel de Asistencia Cloud</h1>
+            <p>Sincronizado en tiempo real con Firebase. Modo Calendario Acumulativo.</p>
+        </div>
+        <div style="display:flex; gap:10px;">
+            <button class="btn btn-outline" onclick="abrirModal()">+ Agregar Alumno</button>
+        </div>
+    </div>
+    
+    <div class="toolbar">
+        <div class="tool-group">
+            <div class="input-box">
+                <label>Fecha de Asistencia</label>
+                <!-- Al cambiar la fecha, carga los datos de esa fecha de Firebase -->
+                <input type="date" id="fechaSeleccionada" onchange="cargarAsistenciasDelDia()">
+            </div>
+            <div class="input-box">
+                <label>Carrera</label>
+                <select id="filtroCarrera" onchange="renderizarTabla()">
+                    <option value="todas">Todas las carreras</option>
+                </select>
+            </div>
+        </div>
+        <button class="btn btn-excel" onclick="descargarExcelAcumulativo()">
+            📥 Exportar Mes (Historial)
+        </button>
+    </div>
+
+    <div class="table-card">
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Alumno</th>
+                        <th>Matrícula</th>
+                        <th>Carrera</th>
+                        <th class="check-cell">Pase 1 (8:00 AM)</th>
+                        <th class="check-cell">Pase 2 (10:00 AM)</th>
+                    </tr>
+                </thead>
+                <tbody id="tabla-cuerpo">
+                    <!-- Se llena con JS -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="modalAgregar">
+    <div class="modal">
+        <div class="modal-header">
+            <h2>Nuevo Alumno en BD</h2>
+            <button class="btn" style="background:none; border:none; color:gray;" onclick="cerrarModal()">X</button>
+        </div>
+        <div class="modal-body">
+            <div class="input-box">
+                <label>Nombre</label>
+                <input type="text" id="nuevoNombre">
+            </div>
+            <div class="input-box">
+                <label>Matrícula (Única)</label>
+                <input type="text" id="nuevaMatricula" placeholder="Ej. 270185000">
+            </div>
+            <div class="input-box">
+                <label>Carrera</label>
+                <input type="text" id="nuevaCarrera">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-primary" onclick="guardarNuevoAlumnoBD()">Guardar en Nube</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Variables Globales de la App
+    let baseAlumnos = []; // El padrón maestro de alumnos (Nombre, Carrera, Matrícula)
+    let asistenciaHoy = {}; // Objeto que guarda el estado de los checkboxes del día seleccionado
+    
+    // Lista inicial (por si la BD está vacía). En uso real, esto se subirá a Firebase una vez.
+    const alumnosSemilla = [{"Nombre": "Fragoso Romero Andr\u00e9s", "Matr\u00edcula": "260176585", "Carrera": "Ingenier\u00eda en Sistemas Computacionales"}, {"Nombre": "Hipolito Morales Juan Carlos", "Matr\u00edcula": "270190519", "Carrera": "Ingenier\u00eda en Sistemas Computacionales"}, {"Nombre": "Margarita Huanetl Lozada", "Matr\u00edcula": "270187555", "Carrera": "Psicolog\u00eda"}, {"Nombre": "Andres Gallegos Vazquez", "Matr\u00edcula": "270187549", "Carrera": "Ingenier\u00eda Civil"}, {"Nombre": "Zaira Viridiana Barranco Rodriguez", "Matr\u00edcula": "270179514", "Carrera": "Comercio Internacional"}];
+
+    // ==========================================
+    // LÓGICA DE FIREBASE Y BASE DE DATOS
+    // ==========================================
+    
+    document.addEventListener('firebase-ready', async () => {
+        try {
+            await cargarPadronMaestro();
+            
+            // Si la base está vacía, subimos los de semilla (Solo pasa la 1ra vez)
+            if(baseAlumnos.length === 0) {
+                document.getElementById('loader-text').innerText = "Inicializando Base de Datos...";
+                for(let al of alumnosSemilla) {
+                    await window.setDoc(window.doc(window.db, "alumnos", al.Matrícula || al.Nombre), {
+                        Nombre: al.Nombre,
+                        Matricula: al.Matrícula,
+                        Carrera: al.Carrera.toUpperCase()
+                    });
+                }
+                await cargarPadronMaestro();
+            }
+
+            actualizarFiltros();
+            
+            // Poner fecha de hoy y cargar
+            document.getElementById('fechaSeleccionada').valueAsDate = new Date();
+            await cargarAsistenciasDelDia();
+            
+            // Ocultar Loader
+            document.getElementById('loader').style.opacity = '0';
+            setTimeout(() => document.getElementById('loader').style.display = 'none', 300);
+
+        } catch (error) {
+            console.error("Error conectando a Firebase:", error);
+            document.getElementById('loader-text').innerText = "Error de conexión. Revisa tu Configuración.";
+        }
+    });
+
+    // 1. Descarga la lista de alumnos desde Firestore
+    async function cargarPadronMaestro() {
+        const snapshot = await window.getDocs(window.collection(window.db, "alumnos"));
+        baseAlumnos = [];
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            baseAlumnos.push({
+                idFirestore: doc.id,
+                Nombre: data.Nombre,
+                Matricula: data.Matricula,
+                Carrera: data.Carrera
+            });
+        });
+        baseAlumnos.sort((a,b) => a.Nombre.localeCompare(b.Nombre)); // Orden alfabético
+    }
+
+    // 2. Carga las asistencias específicas del día seleccionado
+    window.cargarAsistenciasDelDia = async function() {
+        const fecha = document.getElementById('fechaSeleccionada').value;
+        if(!fecha) return;
+
+        // Limpiar estado visual
+        asistenciaHoy = {};
+        
+        // Buscar en la colección 'asistencias' el documento de esa fecha
+        const docRef = window.doc(window.db, "asistencias", fecha);
+        const docSnap = await window.getDoc(docRef);
+
+        if (docSnap.exists()) {
+            asistenciaHoy = docSnap.data().registros || {};
+        }
+        
+        renderizarTabla();
+    };
+
+    // 3. Guarda un check directamente en la nube al hacer clic
+    window.marcarAsistenciaCloud = async function(idAlumno, paseNumero, valorBool) {
+        const fecha = document.getElementById('fechaSeleccionada').value;
+        
+        // Asegurarnos de que el alumno exista en el objeto de hoy
+        if(!asistenciaHoy[idAlumno]) asistenciaHoy[idAlumno] = { p1: false, p2: false };
+        
+        // Actualizar en memoria local
+        if(paseNumero === 1) asistenciaHoy[idAlumno].p1 = valorBool;
+        if(paseNumero === 2) asistenciaHoy[idAlumno].p2 = valorBool;
+
+        // Subir toda la lista del día a Firebase
+        const docRef = window.doc(window.db, "asistencias", fecha);
+        await window.setDoc(docRef, { registros: asistenciaHoy }, { merge: true });
+    };
+
+    // 4. Agregar un alumno nuevo a Firebase
+    window.guardarNuevoAlumnoBD = async function() {
+        const nom = document.getElementById('nuevoNombre').value.trim();
+        const mat = document.getElementById('nuevaMatricula').value.trim();
+        const car = document.getElementById('nuevaCarrera').value.trim().toUpperCase();
+
+        if(!nom || !mat || !car) return alert("Llena todos los campos.");
+
+        // Guardamos el documento usando la matrícula como ID único
+        await window.setDoc(window.doc(window.db, "alumnos", mat), {
+            Nombre: nom, Matricula: mat, Carrera: car
+        });
+
+        await cargarPadronMaestro();
+        actualizarFiltros();
+        renderizarTabla();
+        cerrarModal();
+    };
+
+    // ==========================================
+    // LÓGICA DE INTERFAZ Y EXCEL
+    // ==========================================
+
+    function actualizarFiltros() {
+        const select = document.getElementById('filtroCarrera');
+        const carrerasUnicas = [...new Set(baseAlumnos.map(a => a.Carrera))].sort();
+        
+        let html = '<option value="todas">Todas las carreras</option>';
+        carrerasUnicas.forEach(c => html += `<option value="${c}">${c}</option>`);
+        select.innerHTML = html;
+    }
+
+    window.renderizarTabla = function() {
+        const tbody = document.getElementById('tabla-cuerpo');
+        const filtro = document.getElementById('filtroCarrera').value;
+        tbody.innerHTML = '';
+
+        const alumnosFiltrados = filtro === 'todas' ? baseAlumnos : baseAlumnos.filter(a => a.Carrera === filtro);
+
+        alumnosFiltrados.forEach(alumno => {
+            // Revisar si este alumno tiene checks guardados hoy
+            const asis = asistenciaHoy[alumno.idFirestore] || {p1: false, p2: false};
+            
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${alumno.Nombre}</td>
+                <td>${alumno.Matricula || ''}</td>
+                <td><span class="badge">${alumno.Carrera}</span></td>
+                <td class="check-cell"><input type="checkbox" ${asis.p1 ? 'checked' : ''} onchange="marcarAsistenciaCloud('${alumno.idFirestore}', 1, this.checked)"></td>
+                <td class="check-cell"><input type="checkbox" ${asis.p2 ? 'checked' : ''} onchange="marcarAsistenciaCloud('${alumno.idFirestore}', 2, this.checked)"></td>
+            `;
+            tbody.appendChild(tr);
+        });
+    };
+
+    // Modal UI
+    window.abrirModal = () => document.getElementById('modalAgregar').classList.add('active');
+    window.cerrarModal = () => document.getElementById('modalAgregar').classList.remove('active');
+
+    // EXCEL ACUMULATIVO (HISTORIAL COMPLETO)
+    window.descargarExcelAcumulativo = async function() {
+        document.getElementById('loader-text').innerText = "Generando historial. Por favor espera...";
+        document.getElementById('loader').style.display = 'flex';
+        document.getElementById('loader').style.opacity = '1';
+
+        try {
+            const meses = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
+            const hoy = new Date();
+            const anioStr = hoy.getFullYear();
+            const mesStr = meses[hoy.getMonth()];
+
+            // 1. Descargamos TODAS las fechas de la base de datos
+            const snapshotAsist = await window.getDocs(window.collection(window.db, "asistencias"));
+            let historial = {};
+            let fechasRegistradas = [];
+
+            snapshotAsist.forEach(doc => {
+                fechasRegistradas.push(doc.id); // ej: "2026-09-24", "2026-09-25"
+                historial[doc.id] = doc.data().registros;
+            });
+            
+            // Ordenar fechas cronológicamente de izquierda a derecha
+            fechasRegistradas.sort();
+
+            const wb = XLSX.utils.book_new();
+            const filtro = document.getElementById('filtroCarrera').value;
+            let carreras = filtro === 'todas' ? [...new Set(baseAlumnos.map(a => a.Carrera))].sort() : [filtro];
+
+            carreras.forEach(carrera => {
+                const alumnosCar = baseAlumnos.filter(a => a.Carrera === carrera);
+                
+                // Construir encabezados base
+                const headerBase = ["N.P.", "MATRICULA", "NOMBRE"];
+                let filaFechas = [null, null, null]; // Para la fila 8 (donde van los números de día)
+                
+                // Agregar las columnas de fechas dinámicamente
+                fechasRegistradas.forEach(fecha => {
+                    const diaNum = parseInt(fecha.split('-')[2], 10);
+                    filaFechas.push(diaNum, diaNum); // Dos columnas por día
+                    headerBase.push(`PASE 1 (${fecha})`, `PASE 2 (${fecha})`);
+                });
+
+                const dataHoja = [
+                    [null, "LICENCIATURA:", carrera],
+                    [null, "GRUPO:", ""],
+                    [null, "MATERIA:", ""],
+                    [null, "DOCENTE:", ""],
+                    [null, "TURNO:", "ESCOLARIZADO"],
+                    [null, "PERIODO:", anioStr.toString(), mesStr],
+                    [], // Fila en blanco
+                    filaFechas // Los números de días (Ej: NaN, NaN, NaN, 24, 24, 25, 25...)
+                ];
+
+                // Rellenar filas de alumnos
+                alumnosCar.forEach((alumno, idx) => {
+                    let filaAlumno = [idx + 1, alumno.Matricula, alumno.Nombre];
+                    
+                    // Buscar la asistencia de este alumno en cada fecha registrada
+                    fechasRegistradas.forEach(fecha => {
+                        const recsDia = historial[fecha] || {};
+                        const asisDeEsteAlumno = recsDia[alumno.idFirestore] || {p1: false, p2: false};
+                        filaAlumno.push(asisDeEsteAlumno.p1 ? 1 : 0);
+                        filaAlumno.push(asisDeEsteAlumno.p2 ? 1 : 0);
+                    });
+                    
+                    dataHoja.push(filaAlumno);
+                });
+                
+                const ws = XLSX.utils.aoa_to_sheet(dataHoja);
+                XLSX.utils.book_append_sheet(wb, ws, carrera.substring(0, 31));
+            });
+
+            XLSX.writeFile(wb, `Historial_Asistencia_${anioStr}_${mesStr}.xlsx`);
+            
+        } catch (error) {
+            console.error(error);
+            alert("Hubo un error al generar el historial.");
+        } finally {
+            document.getElementById('loader').style.opacity = '0';
+            setTimeout(() => document.getElementById('loader').style.display = 'none', 300);
+        }
+    }
+</script>
+</body>
+</html>
+
