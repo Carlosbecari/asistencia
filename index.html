@@ -11,20 +11,16 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-app.js";
         import { getFirestore, collection, getDocs, doc, setDoc, getDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js";
-        // Si no quieres analytics, puedes comentar la siguiente línea
-        // import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-analytics.js";
 
-        // ==========================================
-        // ⚠️ PEGA TU CONFIGURACIÓN DE FIREBASE AQUÍ:
-        // ==========================================
         const firebaseConfig = {
-            apiKey: "TU_API_KEY",
-            authDomain: "TU_PROYECTO.firebaseapp.com",
-            projectId: "TU_PROYECTO",
-            storageBucket: "TU_PROYECTO.appspot.com",
-            messagingSenderId: "TU_SENDER_ID",
-            appId: "TU_APP_ID"
-        };
+  apiKey: "AIzaSyBcehX3MaEmCieovpjS4I0QDcB4g40Zoto",
+  authDomain: "innovacodehub-asistencia.firebaseapp.com",
+  projectId: "innovacodehub-asistencia",
+  storageBucket: "innovacodehub-asistencia.firebasestorage.app",
+  messagingSenderId: "292148773576",
+  appId: "1:292148773576:web:c68bb0e7ed269623459bfd",
+  measurementId: "G-3MVNQGE894"
+};
 
         const app = initializeApp(firebaseConfig);
         // const analytics = getAnalytics(app); // Opcional
