@@ -15,7 +15,421 @@
       const firebaseConfig = {
   apiKey: "AIzaSyBcehX3MaEmCieovpjS4I0QDcB4g40Zoto",
   authDomain: "innovacodehub-asistencia.firebaseapp.com",
+  projectId: "innovacodehub-asistencia",<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pase de Asistencia Cloud | Nexu</title>
+    <!-- Librería para generar Excel (.xlsx) -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    
+    <!-- Librerías de Firebase (v9 modular) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-app.js";
+        import { getFirestore, collection, getDocs, doc, setDoc, getDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js";
+        // Si no quieres analytics, puedes comentar la siguiente línea
+        // import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-analytics.js";
+
+        const firebaseConfig = {
+  apiKey: "AIzaSyBcehX3MaEmCieovpjS4I0QDcB4g40Zoto",
+  authDomain: "innovacodehub-asistencia.firebaseapp.com",
   projectId: "innovacodehub-asistencia",
+  storageBucket: "innovacodehub-asistencia.firebasestorage.app",
+  messagingSenderId: "292148773576",
+  appId: "1:292148773576:web:c68bb0e7ed269623459bfd",
+  measurementId: "G-3MVNQGE894"
+};
+
+        const app = initializeApp(firebaseConfig);
+        // const analytics = getAnalytics(app); // Opcional
+        const db = getFirestore(app);
+        
+        // Exponer globalmente
+        window.db = db;
+        window.collection = collection;
+        window.getDocs = getDocs;
+        window.doc = doc;
+        window.setDoc = setDoc;
+        window.getDoc = getDoc;
+        window.deleteDoc = deleteDoc;
+        
+        document.dispatchEvent(new Event('firebase-ready'));
+    </script>
+
+    <style>
+        :root {
+            --bg-body: #f4f2f9; --bg-card: #ffffff; --primary: #7c3aed; --primary-hover: #6d28d9;
+            --primary-light: #ede9fe; --text-main: #1e293b; --text-muted: #64748b; --border: #e2e8f0;
+            --danger: #ef4444; --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', system-ui, sans-serif; }
+        body { background-color: var(--bg-body); color: var(--text-main); padding: 2rem 1rem; display: flex; justify-content: center; }
+        .app-container { width: 100%; max-width: 1100px; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem; }
+        .title h1 { font-size: 1.5rem; font-weight: 700; color: var(--primary); }
+        .title p { font-size: 0.875rem; color: var(--text-muted); margin-top: 0.25rem; }
+        
+        #loader {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255,255,255,0.9); z-index: 9999;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            font-weight: bold; color: var(--primary); transition: opacity 0.3s;
+        }
+        .spinner {
+            border: 4px solid var(--primary-light); border-top: 4px solid var(--primary);
+            border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 15px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        .toolbar { background: var(--bg-card); padding: 1rem 1.5rem; border-radius: 12px; box-shadow: var(--shadow); display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem; }
+        .tool-group { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+        .input-box { display: flex; flex-direction: column; gap: 0.25rem; }
+        .input-box label { font-size: 0.75rem; text-transform: uppercase; font-weight: 600; color: var(--text-muted); }
+        input[type="date"], select, input[type="text"] { padding: 0.5rem 0.75rem; border: 1px solid var(--border); border-radius: 8px; font-size: 0.875rem; outline: none; background-color: #f8fafc; }
+        .btn { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1rem; border: none; border-radius: 8px; font-size: 0.875rem; font-weight: 600; cursor: pointer; transition: 0.2s; }
+        .btn-primary { background-color: var(--primary); color: white; }
+        .btn-outline { background-color: transparent; color: var(--primary); border: 1px solid var(--primary); }
+        .btn-excel { background-color: #107c41; color: white; }
+        .btn-danger { background-color: var(--danger); color: white; }
+        
+        .table-card { background: var(--bg-card); border-radius: 12px; box-shadow: var(--shadow); overflow: hidden; }
+        .table-responsive { width: 100%; overflow-x: auto; max-height: 60vh; }
+        table { width: 100%; border-collapse: collapse; text-align: left; white-space: nowrap; }
+        th { background-color: #f8fafc; color: var(--text-muted); font-size: 0.75rem; padding: 1rem; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10; }
+        td { padding: 1rem; border-bottom: 1px solid var(--border); font-size: 0.875rem; }
+        tr:hover td { background-color: #fcfbfd; }
+        .badge { background-color: var(--primary-light); color: var(--primary-hover); padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
+        .check-cell { text-align: center; }
+        input[type="checkbox"] { width: 1.25rem; height: 1.25rem; border-radius: 4px; border: 2px solid var(--border); appearance: none; outline: none; cursor: pointer; position: relative; }
+        input[type="checkbox"]:checked { background-color: var(--primary); border-color: var(--primary); }
+        input[type="checkbox"]:checked::after { content: ''; position: absolute; left: 5px; top: 1px; width: 5px; height: 10px; border: solid white; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+        
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.5); display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: 0.3s; z-index: 50; }
+        .modal-overlay.active { opacity: 1; pointer-events: auto; }
+        .modal { background: var(--bg-card); width: 100%; max-width: 400px; border-radius: 12px; padding: 1.5rem; transform: translateY(20px); transition: 0.3s; }
+        .modal-overlay.active .modal { transform: translateY(0); }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+        .modal-body { display: flex; flex-direction: column; gap: 1rem; margin-bottom: 1.5rem; }
+        .modal-footer { display: flex; justify-content: flex-end; gap: 0.5rem; }
+    </style>
+</head>
+<body>
+
+<div id="loader">
+    <div class="spinner"></div>
+    <span id="loader-text">Conectando a la nube...</span>
+</div>
+
+<div class="app-container">
+    <div class="header">
+        <div class="title">
+            <h1>Panel de Asistencia Cloud</h1>
+            <p>Sincronizado en Firebase. Modo Calendario Acumulativo.</p>
+        </div>
+        <div style="display:flex; gap:10px;">
+            <!-- BOTÓN DE RESETEO MAESTRO (USAR SOLO UNA VEZ) -->
+            <button class="btn btn-danger" onclick="inyectarTodosLosAlumnos()" title="Carga la lista original de 123 alumnos a Firebase" style="font-size:12px;">⚠️ Subir 123 alumnos a Nube</button>
+            <button class="btn btn-outline" onclick="abrirModal()">+ Agregar Alumno</button>
+        </div>
+    </div>
+    
+    <div class="toolbar">
+        <div class="tool-group">
+            <div class="input-box">
+                <label>Fecha de Asistencia</label>
+                <input type="date" id="fechaSeleccionada" onchange="cargarAsistenciasDelDia()">
+            </div>
+            <div class="input-box">
+                <label>Carrera</label>
+                <select id="filtroCarrera" onchange="renderizarTabla()">
+                    <option value="todas">Todas las carreras</option>
+                </select>
+            </div>
+        </div>
+        <button class="btn btn-excel" onclick="descargarExcelAcumulativo()">
+            📥 Exportar Excel (Historial)
+        </button>
+    </div>
+
+    <div class="table-card">
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Alumno</th>
+                        <th>Matrícula</th>
+                        <th>Carrera</th>
+                        <th class="check-cell">Pase 1 (8:00 AM)</th>
+                        <th class="check-cell">Pase 2 (10:00 AM)</th>
+                    </tr>
+                </thead>
+                <tbody id="tabla-cuerpo">
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modalAgregar">
+    <div class="modal">
+        <div class="modal-header">
+            <h2>Nuevo Alumno en BD</h2>
+            <button class="btn" style="background:none; border:none; color:gray;" onclick="cerrarModal()">X</button>
+        </div>
+        <div class="modal-body">
+            <div class="input-box">
+                <label>Nombre</label>
+                <input type="text" id="nuevoNombre">
+            </div>
+            <div class="input-box">
+                <label>Matrícula (Única)</label>
+                <input type="text" id="nuevaMatricula" placeholder="Ej. 270185000">
+            </div>
+            <div class="input-box">
+                <label>Carrera</label>
+                <input type="text" id="nuevaCarrera">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-primary" onclick="guardarNuevoAlumnoBD()">Guardar en Nube</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let baseAlumnos = [];
+    let asistenciaHoy = {}; 
+    
+    // AQUÍ ESTÁN LOS 123 ALUMNOS ORIGINALES
+    const alumnosOriginales = [{"Nombre": "Fragoso Romero Andr\u00e9s", "Matr\u00edcula": "260176585", "Carrera": "Ingenier\u00eda en Sistemas Computacionales"}, {"Nombre": "Hipolito Morales Juan Carlos", "Matr\u00edcula": "270190519", "Carrera": "Ingenier\u00eda en Sistemas Computacionales"}, {"Nombre": "Lara Tepale Giovanny", "Matr\u00edcula": "270174811", "Carrera": "Ingenier\u00eda en Sistemas Computacionales"}, {"Nombre": "Molina Vazquez Benjam\u00edn", "Matr\u00edcula": "270185155", "Carrera": "Ingenier\u00eda en Sistemas Computacionales"}, {"Nombre": "Munguia Munguia Dulce Maria", "Matr\u00edcula": "270180570", "Carrera": "Ingenier\u00eda en Sistemas Computacionales"}, {"Nombre": "Diego Zamora Solis", "Matr\u00edcula": "270182054", "Carrera": "Ingenier\u00eda en Sistemas Computacionales"}, {"Nombre": "Margarita Huanetl Lozada", "Matr\u00edcula": "270187555", "Carrera": "Psicolog\u00eda"}, {"Nombre": "Yazmin Alexandra Urbino Dominguez", "Matr\u00edcula": "270181547", "Carrera": "Psicolog\u00eda"}, {"Nombre": "Tabatha Zoe Lim\u00f3n Martinez", "Matr\u00edcula": "270188193", "Carrera": "Psicolog\u00eda"}, {"Nombre": "M\u00e1ximo Ismael Rojas P\u00e9rez", "Matr\u00edcula": "260180352", "Carrera": "Psicolog\u00eda"}, {"Nombre": "Leonardo Oliver Cisneros Hdez", "Matr\u00edcula": "270180508", "Carrera": "Psicolog\u00eda"}, {"Nombre": "Tepetitla Popoca Osvaldo", "Matr\u00edcula": "270186418", "Carrera": "Psicolog\u00eda"}, {"Nombre": "Anthony Gutierrez Marquez", "Matr\u00edcula": "270182944", "Carrera": "Psicolog\u00eda"}, {"Nombre": "Derek Yerai Ortega del Castillo", "Matr\u00edcula": "270187142", "Carrera": "Psicolog\u00eda"}, {"Nombre": "Andres Gallegos Vazquez", "Matr\u00edcula": "270187549", "Carrera": "Ingenier\u00eda Civil"}, {"Nombre": "Julio Cesar Zayos Lopez", "Matr\u00edcula": "270190440", "Carrera": "Ingenier\u00eda Civil"}, {"Nombre": "Luis Felipe Moguel Herrera", "Matr\u00edcula": "270189716", "Carrera": "Ingenier\u00eda Civil"}, {"Nombre": "Alexander Hernandez Galupila", "Matr\u00edcula": "270177626", "Carrera": "Ingenier\u00eda Civil"}, {"Nombre": "Ana Valeria Jaramillo Arias", "Matr\u00edcula": "270191939", "Carrera": "Ingenier\u00eda Civil"}, {"Nombre": "Edwin Vilchis Hernandez", "Matr\u00edcula": "270185434", "Carrera": "Ingenier\u00eda Civil"}, {"Nombre": "Monserrat Texucono Flores", "Matr\u00edcula": "270183676", "Carrera": "Comercio Internacional"}, {"Nombre": "Zaira Viridiana Barranco Rodriguez", "Matr\u00edcula": "270179514", "Carrera": "Comercio Internacional"}, {"Nombre": "Dulce Maria Lopez Romero", "Matr\u00edcula": "270189943", "Carrera": "Comercio Internacional"}, {"Nombre": "Ximena Itzayana Hern\u00e1ndez Varela", "Matr\u00edcula": "270187484", "Carrera": "Comercio Internacional"}, {"Nombre": "Guillermina Michell Villanueva Sanchez", "Matr\u00edcula": "260182345", "Carrera": "Comercio Internacional"}, {"Nombre": "Maria Luisa Rodriguez Vivanco", "Matr\u00edcula": "270180338", "Carrera": "Comercio Internacional"}, {"Nombre": "Ar\u00f3n Castro Lim\u00f3n", "Matr\u00edcula": "270192023", "Carrera": "Comercio Internacional"}, {"Nombre": "Ana Beatriz Munive Garcia", "Matr\u00edcula": "270183834", "Carrera": "Administraci\u00f3n"}, {"Nombre": "Diana Paola Rosas Garcia", "Matr\u00edcula": "270180821", "Carrera": "Administraci\u00f3n"}, {"Nombre": "Edith Arely Ramirez Prisco", "Matr\u00edcula": "270180821", "Carrera": "Administraci\u00f3n"}, {"Nombre": "Jesus Eduardo Mendieta Vazquez", "Matr\u00edcula": "270179248", "Carrera": "Administraci\u00f3n"}, {"Nombre": "Julio Cesar Totolhua Morales", "Matr\u00edcula": "270188212", "Carrera": "Administraci\u00f3n"}, {"Nombre": "Maria Fernanda Francisco Perez", "Matr\u00edcula": "270188661", "Carrera": "Administraci\u00f3n"}, {"Nombre": "Milagros Hernandez Torres", "Matr\u00edcula": "270175590", "Carrera": "Administraci\u00f3n"}, {"Nombre": "Naomi Arlett Hernandez Flores", "Matr\u00edcula": "270188490", "Carrera": "Administraci\u00f3n"}, {"Nombre": "Valentina Perez Huitzil", "Matr\u00edcula": "270192702", "Carrera": "Gastronom\u00eda"}, {"Nombre": "Marco Antonio Perez Flores", "Matr\u00edcula": "270192264", "Carrera": "Gastronom\u00eda"}, {"Nombre": "Adri\u00e1n Urzco Marquez Solano", "Matr\u00edcula": "270188562", "Carrera": "Gastronom\u00eda"}, {"Nombre": "Zandon Zair Many Ortega", "Matr\u00edcula": "270192686", "Carrera": "Gastronom\u00eda"}, {"Nombre": "Axel Ury Quecholli Hernandez", "Matr\u00edcula": "270186934", "Carrera": "Gastronom\u00eda"}, {"Nombre": "Anthony Peter Mendez Rojas", "Matr\u00edcula": "270181643", "Carrera": "Gastronom\u00eda"}, {"Nombre": "Christian Uriel Olivera Vazquez", "Matr\u00edcula": "270185898", "Carrera": "Gastronom\u00eda"}, {"Nombre": "Mariana Lopez Arriaga", "Matr\u00edcula": "270187467", "Carrera": "Gastronom\u00eda"}, {"Nombre": "Sandra Hernandez Gonzalez", "Matr\u00edcula": "270187553", "Carrera": "Gastronom\u00eda"}, {"Nombre": "Shamara Natividad Gutierrez Perez", "Matr\u00edcula": "270184670", "Carrera": "Gastronom\u00eda"}, {"Nombre": "Angel Zair Valero Martinez", "Matr\u00edcula": "270186254", "Carrera": "Gastronom\u00eda"}, {"Nombre": "Harlen Solano Hdez", "Matr\u00edcula": "270187373", "Carrera": "Gastronom\u00eda"}, {"Nombre": "Alondra Paredes Suarez", "Matr\u00edcula": "270190641", "Carrera": "Derecho"}, {"Nombre": "Javier David mora macareno", "Matr\u00edcula": "270189774", "Carrera": "Derecho"}, {"Nombre": "Dulce Araceli paz Garcia", "Matr\u00edcula": "270189514", "Carrera": "Derecho"}, {"Nombre": "Omar Vazquez Rosas", "Matr\u00edcula": "260336008", "Carrera": "Derecho"}, {"Nombre": "Jacqueline Morales S\u00e1nchez", "Matr\u00edcula": "270176376", "Carrera": "Derecho"}, {"Nombre": "Citlaly Hernandez Ramos", "Matr\u00edcula": "260181373", "Carrera": "Derecho"}, {"Nombre": "B\u00e1rbara Alexandra Rodr\u00edguez Astete", "Matr\u00edcula": "2311163393", "Carrera": "Derecho"}, {"Nombre": "Martha Cristina Salazar Garcia", "Matr\u00edcula": "2212583111", "Carrera": "Derecho"}, {"Nombre": "Fernanda Vianney Aguilar Perez", "Matr\u00edcula": "270187109", "Carrera": "Derecho"}, {"Nombre": "Joana Lizbeth Oropeza Martinez", "Matr\u00edcula": "270190487", "Carrera": "Derecho"}, {"Nombre": "Dulce Maria Munguia Munguia", "Matr\u00edcula": "270180670", "Carrera": "Derecho"}, {"Nombre": "Kevin Cristhian Ramos Pozo", "Matr\u00edcula": "270172362", "Carrera": "Derecho"}, {"Nombre": "Maria Isabel Guzman Montes", "Matr\u00edcula": "270187471", "Carrera": "Derecho"}, {"Nombre": "Jesua Baez Mu\u00f1oz", "Matr\u00edcula": "270188900", "Carrera": "Derecho"}, {"Nombre": "Kenia Sanchez Mastranzo", "Matr\u00edcula": "270183483", "Carrera": "Pedagog\u00eda"}, {"Nombre": "Sarahi P\u00e9rez Jim\u00e9nez", "Matr\u00edcula": "270176662", "Carrera": "Pedagog\u00eda"}, {"Nombre": "Nohemi Nayeli Juarez Romero", "Matr\u00edcula": "270186431", "Carrera": "Pedagog\u00eda"}, {"Nombre": "Miriam Hern\u00e1ndez Reyes", "Matr\u00edcula": "270178024", "Carrera": "Pedagog\u00eda"}, {"Nombre": "Noemi Luna Hern\u00e1ndez", "Matr\u00edcula": "270181202", "Carrera": "Pedagog\u00eda"}, {"Nombre": "Ivonne Nancy Tlacomulco Sanchez", "Matr\u00edcula": "270189247", "Carrera": "Pedagog\u00eda"}, {"Nombre": "Berenice Fernandez Cortes", "Matr\u00edcula": "270187112", "Carrera": "Pedagog\u00eda"}, {"Nombre": "Maria de los Angeles Castillo Reyes", "Matr\u00edcula": "270192722", "Carrera": "Pedagog\u00eda"}, {"Nombre": "Michel Areni Mendizabal Aguilar", "Matr\u00edcula": "270185726", "Carrera": "Pedagog\u00eda"}, {"Nombre": "Brenda P\u00e9rez Mora", "Matr\u00edcula": "270185401", "Carrera": "Pedagog\u00eda"}, {"Nombre": "Janeth Ramirez Vargas", "Matr\u00edcula": "270186127", "Carrera": "Pedagog\u00eda"}, {"Nombre": "Frida Camila Bueno Fragoso", "Matr\u00edcula": "270189146", "Carrera": "Pedagog\u00eda"}, {"Nombre": "Liliana Xelano Galindo", "Matr\u00edcula": "270190055", "Carrera": "Pedagog\u00eda"}, {"Nombre": "Alison Fany Popoca Ahumada", "Matr\u00edcula": "270190074", "Carrera": "Pedagog\u00eda"}, {"Nombre": "Victoria Gallegos Soto", "Matr\u00edcula": "270180426", "Carrera": "Pedagog\u00eda"}, {"Nombre": "Leslie Alexa Lora Mendoza", "Matr\u00edcula": "270188851", "Carrera": "Pedagog\u00eda"}, {"Nombre": ".", "Matr\u00edcula": "270187262", "Carrera": "Pedagog\u00eda"}, {"Nombre": "Santiago Suarez Crisner", "Matr\u00edcula": "270186589", "Carrera": "Pedagog\u00eda"}, {"Nombre": "Yennedy Arroyo Macero", "Matr\u00edcula": "270177141", "Carrera": "Pedagog\u00eda"}, {"Nombre": "Salom\u00f3n Minor Islas", "Matr\u00edcula": "270181720", "Carrera": "Arquitectura y Dise\u00f1o"}, {"Nombre": "Edmundo Lopez Conde", "Matr\u00edcula": "270188690", "Carrera": "Arquitectura y Dise\u00f1o"}, {"Nombre": "Angel Gabriel Sanchez Diaz", "Matr\u00edcula": "270187046", "Carrera": "Arquitectura y Dise\u00f1o"}, {"Nombre": "Pedro Pablo Mendez Tlacomulco", "Matr\u00edcula": "270184876", "Carrera": "Arquitectura y Dise\u00f1o"}, {"Nombre": "Angel Javier Comisario Juarez", "Matr\u00edcula": "270154702", "Carrera": "Arquitectura y Dise\u00f1o"}, {"Nombre": "Carolina Roque Temich", "Matr\u00edcula": "270176351", "Carrera": "Arquitectura y Dise\u00f1o"}, {"Nombre": "Alan Raul Galindo Viveros", "Matr\u00edcula": "270189739", "Carrera": "Arquitectura y Dise\u00f1o"}, {"Nombre": "Estefania P\u00e9rez Martinez", "Matr\u00edcula": "270191136", "Carrera": "Arquitectura y Dise\u00f1o"}, {"Nombre": "Bruce Amador del Carmen", "Matr\u00edcula": "270182114", "Carrera": "Arquitectura y Dise\u00f1o"}, {"Nombre": "Allison Miranda Flores Cordero", "Matr\u00edcula": "270179736", "Carrera": "Dise\u00f1o Gr\u00e1fico"}, {"Nombre": "Dulce Denisse Olguin Lopez", "Matr\u00edcula": "270181531", "Carrera": "Dise\u00f1o Gr\u00e1fico"}, {"Nombre": "Alan Miguel Macias Romero", "Matr\u00edcula": "270187564", "Carrera": "Dise\u00f1o Gr\u00e1fico"}, {"Nombre": "Maria Fernanda Reyes Reyes", "Matr\u00edcula": "270181667", "Carrera": "Dise\u00f1o Gr\u00e1fico"}, {"Nombre": "Kelly Macedo Rodriguez", "Matr\u00edcula": "270184132", "Carrera": "Dise\u00f1o Gr\u00e1fico"}, {"Nombre": "Gael Carranza Morales", "Matr\u00edcula": "270187348", "Carrera": "Dise\u00f1o Gr\u00e1fico"}, {"Nombre": "Manuel Isahi Enriquez Varela", "Matr\u00edcula": "260180892", "Carrera": "Dise\u00f1o Gr\u00e1fico"}, {"Nombre": "Gloria Nayeli Reyes Sanchez", "Matr\u00edcula": "270787153", "Carrera": "Dise\u00f1o Gr\u00e1fico"}, {"Nombre": "Vanessa Sanchez Zepeda", "Matr\u00edcula": "270185420", "Carrera": "Contadur\u00eda"}, {"Nombre": "Kevin Ulises Vasquez Leon", "Matr\u00edcula": "270176303", "Carrera": "Contadur\u00eda"}, {"Nombre": "Uriel Martinez Rosas", "Matr\u00edcula": "270189277", "Carrera": "Contadur\u00eda"}, {"Nombre": "Larios Tepexi Jahir Juan", "Matr\u00edcula": "270183112", "Carrera": "Contadur\u00eda"}, {"Nombre": "Jose Santiago Pacheco Sanchez", "Matr\u00edcula": "270187462", "Carrera": "Contadur\u00eda"}, {"Nombre": "Neri Urpel Esteban Perez", "Matr\u00edcula": "270182166", "Carrera": "Gastronom\u00eda"}, {"Nombre": "Limon Flores Alondra Itzury", "Matr\u00edcula": "270185466", "Carrera": "Gastronom\u00eda"}, {"Nombre": "Animas Bravo Kevin Alexis", "Matr\u00edcula": "270185048", "Carrera": "Gastronom\u00eda"}, {"Nombre": "Dorian Yamil Jimenez Salazar", "Matr\u00edcula": "270189869", "Carrera": "Gastronom\u00eda"}, {"Nombre": "Ana Laura Livera Atenco", "Matr\u00edcula": "270186428", "Carrera": "Gastronom\u00eda"}, {"Nombre": "Sandra Mabel Rivera Lopez", "Matr\u00edcula": "270190371", "Carrera": "Gastronom\u00eda"}, {"Nombre": "Luz Uriel Gomez Zamudio", "Matr\u00edcula": "270191438", "Carrera": "Gastronom\u00eda"}, {"Nombre": "Diego Perez Duran", "Matr\u00edcula": "270192120", "Carrera": "Gastronom\u00eda"}, {"Nombre": "Christian Raimundo Gonzalez Zepeda", "Matr\u00edcula": "270180668", "Carrera": "Gastronom\u00eda"}, {"Nombre": "norma nayeli popoca ahumada", "Matr\u00edcula": "270190180", "Carrera": "Derecho"}, {"Nombre": "leani michell martinez sanchez", "Matr\u00edcula": "270183201", "Carrera": "Dise\u00f1o Gr\u00e1fico"}, {"Nombre": "vanessa arenas garcia", "Matr\u00edcula": "270189054", "Carrera": "Dise\u00f1o Gr\u00e1fico"}, {"Nombre": "hanny mayranni castro jimenez", "Matr\u00edcula": "270187859", "Carrera": "Criminalistica"}, {"Nombre": "Alison Belinda Romero Perez", "Matr\u00edcula": "270192804", "Carrera": "Criminalistica"}, {"Nombre": "Dulce Miriam", "Matr\u00edcula": "270190424", "Carrera": "Criminalistica"}, {"Nombre": "Diana Santos Cruz", "Matr\u00edcula": "270189539", "Carrera": "Criminalistica"}, {"Nombre": "Naydelin Iris Cortes Feliciano", "Matr\u00edcula": "270186246", "Carrera": "Criminalistica"}, {"Nombre": "Jeremy kaled MARTINES AGUILA", "Matr\u00edcula": "SP-001", "Carrera": "Criminalistica"}, {"Nombre": "Pedro Barres Cobre", "Matr\u00edcula": "SP-002", "Carrera": "Criminalistica"}, {"Nombre": "Elizabeth Arenas Conde", "Matr\u00edcula": "270185457", "Carrera": "Ingenier\u00eda en Sistemas Computacionales"}, {"Nombre": "Gael Sanchez Pelaez", "Matr\u00edcula": "270189010", "Carrera": "Arquitectura y Dise\u00f1o"}];
+
+    document.addEventListener('firebase-ready', async () => {
+        try {
+            await cargarPadronMaestro();
+            
+            // Ponemos la fecha de hoy
+            document.getElementById('fechaSeleccionada').valueAsDate = new Date();
+            await cargarAsistenciasDelDia();
+            
+            document.getElementById('loader').style.opacity = '0';
+            setTimeout(() => document.getElementById('loader').style.display = 'none', 300);
+
+        } catch (error) {
+            console.error(error);
+            document.getElementById('loader-text').innerText = "Error. Revisa configuración y Reglas en BD.";
+        }
+    });
+
+    // --- FUNCIÓN DE RESETEO (INYECCIÓN FORZADA) ---
+    window.inyectarTodosLosAlumnos = async function() {
+        if(!confirm("⚠️ ESTO BORRARÁ LOS ALUMNOS ACTUALES Y SUBIRÁ LOS 123 ORIGINALES A LA NUBE. ¿Deseas continuar?")) return;
+        
+        document.getElementById('loader').style.display = 'flex';
+        document.getElementById('loader').style.opacity = '1';
+        document.getElementById('loader-text').innerText = "Limpiando y subiendo 123 alumnos...";
+
+        try {
+            // 1. Borrar todos los alumnos actuales de Firebase
+            for (let al of baseAlumnos) {
+                await window.deleteDoc(window.doc(window.db, "alumnos", al.idFirestore));
+            }
+            // 2. Subir los 123
+            for(let i=0; i < alumnosOriginales.length; i++) {
+                let al = alumnosOriginales[i];
+                let mat = al.Matrícula ? al.Matrícula.trim() : ("SIN_MATRICULA_" + i);
+                
+                await window.setDoc(window.doc(window.db, "alumnos", mat), {
+                    Nombre: al.Nombre,
+                    Matricula: mat,
+                    Carrera: (al.Carrera || '').trim().toUpperCase()
+                });
+            }
+            alert("✅ ¡Éxito! Los 123 alumnos fueron subidos a Firebase.");
+            await cargarPadronMaestro();
+            renderizarTabla();
+        } catch(e) {
+            alert("Error al subir: " + e.message);
+        } finally {
+            document.getElementById('loader').style.opacity = '0';
+            setTimeout(() => document.getElementById('loader').style.display = 'none', 300);
+        }
+    };
+
+    async function cargarPadronMaestro() {
+        const snapshot = await window.getDocs(window.collection(window.db, "alumnos"));
+        baseAlumnos = [];
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            baseAlumnos.push({ idFirestore: doc.id, Nombre: data.Nombre, Matricula: data.Matricula, Carrera: data.Carrera });
+        });
+        baseAlumnos.sort((a,b) => a.Nombre.localeCompare(b.Nombre)); 
+        actualizarFiltros();
+    }
+
+    window.cargarAsistenciasDelDia = async function() {
+        const fecha = document.getElementById('fechaSeleccionada').value;
+        if(!fecha) return;
+        asistenciaHoy = {};
+        const docSnap = await window.getDoc(window.doc(window.db, "asistencias", fecha));
+        if (docSnap.exists()) asistenciaHoy = docSnap.data().registros || {};
+        renderizarTabla();
+    };
+
+    window.marcarAsistenciaCloud = async function(idAlumno, paseNumero, valorBool) {
+        const fecha = document.getElementById('fechaSeleccionada').value;
+        if(!asistenciaHoy[idAlumno]) asistenciaHoy[idAlumno] = { p1: false, p2: false };
+        if(paseNumero === 1) asistenciaHoy[idAlumno].p1 = valorBool;
+        if(paseNumero === 2) asistenciaHoy[idAlumno].p2 = valorBool;
+
+        await window.setDoc(window.doc(window.db, "asistencias", fecha), { registros: asistenciaHoy }, { merge: true });
+    };
+
+    window.guardarNuevoAlumnoBD = async function() {
+        const nom = document.getElementById('nuevoNombre').value.trim();
+        const mat = document.getElementById('nuevaMatricula').value.trim();
+        const car = document.getElementById('nuevaCarrera').value.trim().toUpperCase();
+
+        if(!nom || !mat || !car) return alert("Llena todos los campos.");
+        await window.setDoc(window.doc(window.db, "alumnos", mat), { Nombre: nom, Matricula: mat, Carrera: car });
+
+        await cargarPadronMaestro();
+        renderizarTabla();
+        cerrarModal();
+    };
+
+    function actualizarFiltros() {
+        const select = document.getElementById('filtroCarrera');
+        const f = select.value;
+        const carrerasUnicas = [...new Set(baseAlumnos.map(a => a.Carrera))].sort();
+        let html = '<option value="todas">Todas las carreras</option>';
+        carrerasUnicas.forEach(c => html += `<option value="${c}">${c}</option>`);
+        select.innerHTML = html;
+        if(carrerasUnicas.includes(f)) select.value = f;
+    }
+
+    window.renderizarTabla = function() {
+        const tbody = document.getElementById('tabla-cuerpo');
+        const filtro = document.getElementById('filtroCarrera').value;
+        tbody.innerHTML = '';
+        const filtrados = filtro === 'todas' ? baseAlumnos : baseAlumnos.filter(a => a.Carrera === filtro);
+
+        if(filtrados.length === 0){
+            tbody.innerHTML = `<tr><td colspan="5" class="text-center" style="padding:2rem;">No hay alumnos aquí.</td></tr>`;
+            return;
+        }
+
+        filtrados.forEach(alumno => {
+            const asis = asistenciaHoy[alumno.idFirestore] || {p1: false, p2: false};
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${alumno.Nombre}</td>
+                <td>${alumno.Matricula || ''}</td>
+                <td><span class="badge">${alumno.Carrera}</span></td>
+                <td class="check-cell"><input type="checkbox" ${asis.p1 ? 'checked' : ''} onchange="marcarAsistenciaCloud('${alumno.idFirestore}', 1, this.checked)"></td>
+                <td class="check-cell"><input type="checkbox" ${asis.p2 ? 'checked' : ''} onchange="marcarAsistenciaCloud('${alumno.idFirestore}', 2, this.checked)"></td>
+            `;
+            tbody.appendChild(tr);
+        });
+    };
+
+    window.abrirModal = () => document.getElementById('modalAgregar').classList.add('active');
+    window.cerrarModal = () => document.getElementById('modalAgregar').classList.remove('active');
+
+    // ==========================================
+    // EXCEL: RECREACIÓN EXACTA DEL FORMATO SOLICITADO
+    // ==========================================
+    window.descargarExcelAcumulativo = async function() {
+        document.getElementById('loader-text').innerText = "Generando Excel oficial...";
+        document.getElementById('loader').style.display = 'flex';
+        document.getElementById('loader').style.opacity = '1';
+
+        try {
+            const meses = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
+            const hoy = new Date();
+            const anioStr = hoy.getFullYear();
+            const mesStr = meses[hoy.getMonth()];
+
+            const snapshotAsist = await window.getDocs(window.collection(window.db, "asistencias"));
+            let historial = {};
+            let fechasRegistradas = [];
+
+            snapshotAsist.forEach(doc => {
+                fechasRegistradas.push(doc.id);
+                historial[doc.id] = doc.data().registros;
+            });
+            fechasRegistradas.sort();
+
+            const wb = XLSX.utils.book_new();
+            const filtro = document.getElementById('filtroCarrera').value;
+            let carreras = filtro === 'todas' ? [...new Set(baseAlumnos.map(a => a.Carrera))].sort() : [filtro];
+
+            carreras.forEach(carrera => {
+                const alumnosCar = baseAlumnos.filter(a => a.Carrera === carrera);
+                
+                // --- CONSTRUCCIÓN DE LAS FILAS DE ENCABEZADO (FILA 8 EXACTA) ---
+                let headerNombres = ["N.P.", "MATRICULA", "NOMBRE"];
+                
+                // Fila 8: Contendrá los números de los días (Ej: 14, 15, 16...)
+                // Para recrear exactamente que las columnas existan, metemos los días como título de columna.
+                fechasRegistradas.forEach(fecha => {
+                    const diaNum = parseInt(fecha.split('-')[2], 10);
+                    headerNombres.push(diaNum, diaNum); // Dos columnas por cada fecha (Pase 1 y Pase 2)
+                });
+
+                // Las primeras 7 filas del Excel (La 7 es en blanco, la 8 es el headerNombres)
+                const dataHoja = [
+                    [null, "LICENCIATURA:", carrera],
+                    [null, "GRUPO:", ""],
+                    [null, "MATERIA:", ""],
+                    [null, "DOCENTE:", ""],
+                    [null, "TURNO:", "ESCOLARIZADO"],
+                    [null, "PERIODO:", anioStr.toString(), mesStr],
+                    [], // Fila 7 vacía
+                    headerNombres // Fila 8: ["N.P.", "MATRICULA", "NOMBRE", 24, 24, 25, 25...]
+                ];
+
+                // --- RELLENO DE ALUMNOS (FILA 9 EN ADELANTE) ---
+                alumnosCar.forEach((alumno, idx) => {
+                    let filaAlumno = [idx + 1, alumno.Matricula, alumno.Nombre];
+                    
+                    fechasRegistradas.forEach(fecha => {
+                        const recsDia = historial[fecha] || {};
+                        const asisAlumno = recsDia[alumno.idFirestore] || {p1: false, p2: false};
+                        filaAlumno.push(asisAlumno.p1 ? 1 : 0);
+                        filaAlumno.push(asisAlumno.p2 ? 1 : 0);
+                    });
+                    
+                    dataHoja.push(filaAlumno);
+                });
+                
+                const ws = XLSX.utils.aoa_to_sheet(dataHoja);
+                
+                // Ancho de columnas para que "N.P.", "MATRICULA" y "NOMBRE" se vean bien
+                // Y los días sean más delgados
+                let colWidths = [{wch: 5}, {wch: 15}, {wch: 45}];
+                fechasRegistradas.forEach(() => {
+                    colWidths.push({wch: 5}, {wch: 5}); // Ancho pequeño para las columnas 1 y 0
+                });
+                ws['!cols'] = colWidths;
+
+                XLSX.utils.book_append_sheet(wb, ws, carrera.substring(0, 31));
+            });
+
+            XLSX.writeFile(wb, `Lista_Asistencia_Acumulativa_${mesStr}.xlsx`);
+            
+        } catch (error) {
+            console.error(error);
+            alert("Error generando Excel.");
+        } finally {
+            document.getElementById('loader').style.opacity = '0';
+            setTimeout(() => document.getElementById('loader').style.display = 'none', 300);
+        }
+    }
+</script>
+</body>
+</html>
   storageBucket: "innovacodehub-asistencia.firebasestorage.app",
   messagingSenderId: "292148773576",
   appId: "1:292148773576:web:c68bb0e7ed269623459bfd",
